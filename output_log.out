@@ -1,0 +1,40 @@
+Using device: cuda
+------------------------------
+Epoch 1/10
+------------------------------
+Train Loss: 0.9141 Acc: 0.7898
+Val Loss: 0.6790 Acc: 0.8422
+Best model saved with loss: 0.6790
+------------------------------
+Epoch 2/10
+------------------------------
+Train Loss: 0.5724 Acc: 0.8677
+Val Loss: 0.4761 Acc: 0.8794
+Best model saved with loss: 0.4761
+------------------------------
+Epoch 3/10
+------------------------------
+Train Loss: 0.4213 Acc: 0.8929
+Val Loss: 0.4059 Acc: 0.8778
+Best model saved with loss: 0.4059
+------------------------------
+Epoch 4/10
+------------------------------
+Train Loss: 0.3373 Acc: 0.9101
+Val Loss: 0.3726 Acc: 0.8806
+Best model saved with loss: 0.3726
+------------------------------
+Epoch 5/10
+------------------------------
+Train Loss: 0.2816 Acc: 0.9229
+Val Loss: 0.3635 Acc: 0.8839
+Best model saved with loss: 0.3635
+------------------------------
+Epoch 6/10
+------------------------------
+Train Loss: 0.2476 Acc: 0.9283
+Val Loss: 0.3488 Acc: 0.8867
+Best model saved with loss: 0.3488
+------------------------------
+Epoch 7/10
+------------------------------
