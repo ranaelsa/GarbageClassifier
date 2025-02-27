@@ -2,3 +2,4 @@ best_model.pth
 jupyter_predictions.out
 jupyter_job.slurm
 .ipynb_checkpoints/
+__pycache__/

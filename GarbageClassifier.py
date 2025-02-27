@@ -3,15 +3,11 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms, models
 from transformers import DistilBertModel, DistilBertTokenizer
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
 import os
 import re
-from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
 from torchvision.models import ResNet18_Weights
 import torch.nn.functional as F
-from sklearn.metrics import roc_curve, auc
+
 
 # Define dataset class
 class CustomImageTextDataset(Dataset):
@@ -153,107 +149,59 @@ def train_model(model, dataloaders, optimizer, criterion, device, num_epochs=10,
     print("\nTraining complete. Best validation loss: {:.4f}".format(best_loss))
     return model
 
-# Define function to evaluate the model
-def evaluate_model(model, dataloader, device):
-    model.eval()  # Set model to evaluation mode
-    all_labels = []
-    all_preds = []  # Store predicted class labels
-    all_probs = []  # Store softmax probabilities
+if __name__ == "__main__":
 
-    with torch.no_grad():  # No gradient calculation needed
-        for batch in dataloader:
-            images = batch['image'].to(device)
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            labels = batch['label'].to(device)
+    # Define data directories
+    TRAIN_PATH  = "/work/TALC/enel645_2025w/garbage_data/CVPR_2024_dataset_Train"
+    VAL_PATH    = "/work/TALC/enel645_2025w/garbage_data/CVPR_2024_dataset_Val"
+    TEST_PATH   = "/work/TALC/enel645_2025w/garbage_data/CVPR_2024_dataset_Test"
 
-            outputs = model(images, input_ids, attention_mask)
-            probs = F.softmax(outputs, dim=1)  # Convert logits to probabilities
-            preds = torch.argmax(probs, dim=1)  # Get class predictions
-
-            all_labels.extend(labels.cpu().numpy())
-            all_preds.extend(preds.cpu().numpy())
-            all_probs.extend(probs.cpu().numpy())  # Store probabilities
-
-    accuracy = (torch.tensor(all_labels) == torch.tensor(all_preds)).sum().item() / len(all_labels)
-    precision = precision_score(all_labels, all_preds, average='weighted', zero_division=0)
-    recall = recall_score(all_labels, all_preds, average='weighted', zero_division=0)
-    f1 = f1_score(all_labels, all_preds, average='weighted', zero_division=0)
-
-    return {
-        'accuracy': accuracy,
-        'precision': precision,
-        'recall': recall,
-        'f1_score': f1,
-        'labels': all_labels,   # Return true labels for confusion matrix
-        'predictions': all_preds,  # Return predicted class labels for confusion matrix
-        'probabilities': all_probs  # Return softmax probabilities for ROC curve
+    # Define transformations for the images
+    transform = {
+        "train": transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(10),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ]),
+        "val": transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ]),
+        "test": transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ]),
     }
 
-# Define data directories
-TRAIN_PATH  = "/work/TALC/enel645_2025w/garbage_data/CVPR_2024_dataset_Train"
-VAL_PATH    = "/work/TALC/enel645_2025w/garbage_data/CVPR_2024_dataset_Val"
-TEST_PATH   = "/work/TALC/enel645_2025w/garbage_data/CVPR_2024_dataset_Test"
+    # Tokenizer
+    tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 
-# Define transformations for the images
-transform = {
-    "train": transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(10),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-    ]),
-    "val": transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-    ]),
-    "test": transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-    ]),
-}
+    # Load datasets
+    datasets_dict = {
+        "train": CustomImageTextDataset(TRAIN_PATH, transform=transform["train"], tokenizer=tokenizer),
+        "val": CustomImageTextDataset(VAL_PATH, transform=transform["val"], tokenizer=tokenizer),
+        "test": CustomImageTextDataset(TEST_PATH, transform=transform["test"], tokenizer=tokenizer)
+    }
 
-# Tokenizer
-tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+    # Define data loaders
+    dataloaders = {
+        "train": DataLoader(datasets_dict["train"], batch_size=32, shuffle=True, num_workers=2), # Shuffle training only
+        "val": DataLoader(datasets_dict["val"], batch_size=32, shuffle=False, num_workers=2),
+        "test": DataLoader(datasets_dict["test"], batch_size=32, shuffle=False, num_workers=2),
+    }
 
-# Load datasets
-datasets = {
-    "train": CustomImageTextDataset(TRAIN_PATH, transform=transform["train"], tokenizer=tokenizer),
-    "val": CustomImageTextDataset(VAL_PATH, transform=transform["val"], tokenizer=tokenizer),
-    "test": CustomImageTextDataset(TEST_PATH, transform=transform["test"], tokenizer=tokenizer)
-}
+    # Define the model
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    model = ResNetBERTClassifier(num_classes=4).to(device)
 
-# Define data loaders
-dataloaders = {
-    "train": DataLoader(datasets["train"], batch_size=32, shuffle=True, num_workers=2), # Shuffle training only
-    "val": DataLoader(datasets["val"], batch_size=32, shuffle=False, num_workers=2),
-    "test": DataLoader(datasets["test"], batch_size=32, shuffle=False, num_workers=2),
-}
+    # Define loss function and optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
 
-# Define the model
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
-model = ResNetBERTClassifier(num_classes=4).to(device)
-
-# Define loss function and optimizer
-criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
-
-# Train the model
-model = train_model(model, dataloaders, optimizer, criterion, device, num_epochs=10, save_path='./best_model.pth')
-
-# Load the best model
-model.load_state_dict(torch.load('./best_model.pth'))
-
-# Evaluate the model
-eval_results = evaluate_model(model, dataloaders['test'], device)
-
-# Print Evaluation Metrics
-print("\n--- Evaluation Metrics on Test Set ---")
-print(f"Test Accuracy : {eval_results['accuracy']:.4f}")
-print(f"Precision     : {eval_results['precision']:.4f}")
-print(f"Recall        : {eval_results['recall']:.4f}")
-print(f"F1 Score      : {eval_results['f1_score']:.4f}")
+    # Train the model
+    model = train_model(model, dataloaders, optimizer, criterion, device, num_epochs=10, save_path='./best_model.pth')
